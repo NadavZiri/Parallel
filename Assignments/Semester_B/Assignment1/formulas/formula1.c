@@ -1,3 +1,4 @@
+/* 211388921 Nadav Ziri */
 #include <xmmintrin.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,5 +29,5 @@ float formula1(float *x, unsigned int length)
     _mm_storeu_ps(prod_arr, prod_vec);
     float product = prod_arr[0] * prod_arr[1] * prod_arr[2] * prod_arr[3];
     sum = cbrtf(sum);
-    return sqrt(1 + (sum/product));
+    return sqrtf(1 + (sum/product));
 }
