@@ -20,6 +20,7 @@ PointSet *createPointSet(int numPoints) {
     p->numPoints = numPoints;
     p->points = (Point *)malloc((size_t)numPoints * sizeof(Point));
     p->assignments = (int *)malloc((size_t)numPoints * sizeof(int));
+    #pragma omp parallel for
     for (int i = 0; i < numPoints; i++) {
         p->assignments[i] = 0;
     }
@@ -65,6 +66,7 @@ int runKMeans(PointSet *data, Centroids *centroids, int maxIters, double toleran
 
     for (iter = 0; iter < maxIters; iter++) {
         /* Assignment step: nearest centroid for every point. */
+        #pragma omp parallel for schedule(static)
         for (int i = 0; i < n; i++) {
             double bestDist = squaredDistance(data->points[i], centroids->centroids[0]);
             int bestCluster = 0;
@@ -85,6 +87,7 @@ int runKMeans(PointSet *data, Centroids *centroids, int maxIters, double toleran
             counts[c] = 0;
         }
 
+        #pragma omp parallel for reduction(+:sumX[:k], sumY[:k], counts[:k])
         /* Accumulate into each cluster. */
         for (int i = 0; i < n; i++) {
             int c = data->assignments[i];
@@ -95,6 +98,7 @@ int runKMeans(PointSet *data, Centroids *centroids, int maxIters, double toleran
 
         /* Recompute centroids; track largest movement for convergence. */
         double maxMovement = 0.0;
+        #pragma omp parallel for reduction(max:maxMovement)
         for (int c = 0; c < k; c++) {
             if (counts[c] == 0) continue;
             Point updated;

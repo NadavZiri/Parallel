@@ -73,7 +73,7 @@ void createGaussianKernel(int radius, double sigma, double **kernel, double *sum
     double local_sum = 0.0;
 
     *kernel = (double *)malloc(kernelWidth * kernelWidth * sizeof(double));
-    #pragma omp parallel for collapse(2) shared(kernel, kernelWidth, radius) reduction(+:local_sum) default(none)
+    #pragma omp parallel for collapse(2) shared(kernel, kernelWidth, radius, sigma) reduction(+:local_sum) default(none)
     for (int x = -radius; x <= radius; x++) {
         for (int y = -radius; y <= radius; y++) {
             double exponentNumerator = -(x * x + y * y);
@@ -81,12 +81,12 @@ void createGaussianKernel(int radius, double sigma, double **kernel, double *sum
             double eExpression = exp(exponentNumerator / exponentDenominator);
             double kernelValue = (eExpression / (2 * M_PI * sigma * sigma));
             (*kernel)[(x + radius) * kernelWidth + (y + radius)] = kernelValue;
-            *sum += kernelValue;
+            local_sum += kernelValue;
         }
     }
     *sum = local_sum;
 
-    #pragma omp parallel for shared(kernel, total_elements, sum) default(none)
+    #pragma omp parallel for shared(kernel, total_elements, sum, kernelWidth) default(none)
     for (int i = 0; i < kernelWidth * kernelWidth; i++) {
         (*kernel)[i] /= *sum;
     }
@@ -107,7 +107,7 @@ Image *createBlurredImage(int radius, Image *image) {
 
     createGaussianKernel(radius, sigma, &kernel, &sum);
 
-    #pragma omp parallel for collapse(3) shared(kernel, width, height, kernelWidth, radius) default(none)
+    #pragma omp parallel for collapse(2) shared(kernel, width, height, kernelWidth, radius, image, outputImage) default(none)
     for (int x = radius; x < width - radius; x++) {
         for (int y = radius; y < height - radius; y++) {
             double redValue = 0.0;
