@@ -33,7 +33,7 @@ Image *loadImage(const char *filename) {
     image->width = width;
     image->height = height;
     image->pixels = (RGBA *)malloc(width * height * sizeof(RGBA));
-
+    #pragma omp parallel for
     for (int i = 0; i < width * height; i++) {
         image->pixels[i].r = data[4 * i + 0];
         image->pixels[i].g = data[4 * i + 1];
@@ -48,7 +48,7 @@ Image *loadImage(const char *filename) {
 // Function to save an image
 void saveImage(const char *filename, Image *image) {
     unsigned char *data = (unsigned char *)malloc(image->width * image->height * 4);
-
+    #pragma omp parallel for
     for (int i = 0; i < image->width * image->height; i++) {
         data[4 * i + 0] = image->pixels[i].r;
         data[4 * i + 1] = image->pixels[i].g;
@@ -67,10 +67,13 @@ void saveImage(const char *filename, Image *image) {
 
 void createGaussianKernel(int radius, double sigma, double **kernel, double *sum) {
     int kernelWidth = (2 * radius) + 1;
+    int total_elements = kernelWidth * kernelWidth;
     *sum = 0.0;
 
-    *kernel = (double *)malloc(kernelWidth * kernelWidth * sizeof(double));
+    double local_sum = 0.0;
 
+    *kernel = (double *)malloc(kernelWidth * kernelWidth * sizeof(double));
+    #pragma omp parallel for collapse(2) shared(kernel, kernelWidth, radius) reduction(+:local_sum) default(none)
     for (int x = -radius; x <= radius; x++) {
         for (int y = -radius; y <= radius; y++) {
             double exponentNumerator = -(x * x + y * y);
@@ -81,7 +84,9 @@ void createGaussianKernel(int radius, double sigma, double **kernel, double *sum
             *sum += kernelValue;
         }
     }
+    *sum = local_sum;
 
+    #pragma omp parallel for shared(kernel, total_elements, sum) default(none)
     for (int i = 0; i < kernelWidth * kernelWidth; i++) {
         (*kernel)[i] /= *sum;
     }
@@ -102,6 +107,7 @@ Image *createBlurredImage(int radius, Image *image) {
 
     createGaussianKernel(radius, sigma, &kernel, &sum);
 
+    #pragma omp parallel for collapse(3) shared(kernel, width, height, kernelWidth, radius) default(none)
     for (int x = radius; x < width - radius; x++) {
         for (int y = radius; y < height - radius; y++) {
             double redValue = 0.0;
